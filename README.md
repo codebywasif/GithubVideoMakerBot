@@ -1,6 +1,6 @@
 # GitHub Video Maker Bot 🚀
 
-Automatically create engaging, short-form videos (for TikTok, YouTube Shorts, or Instagram Reels) showcasing trending GitHub repositories!
+Scrapes the trending repositories on GitHub and Automatically create engaging, short-form videos (for TikTok, YouTube Shorts, or Instagram Reels) showcasing trending GitHub repositories!
 
 All done WITHOUT manual video editing or asset compiling. Just pure ✨programming magic✨.
 
