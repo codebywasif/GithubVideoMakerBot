@@ -10,7 +10,7 @@ Write a concise, engaging narration script.
 
 Rules:
 - MUST start exactly with this phrase: "This repository is trending on GitHub..."
-- Do NOT mention or say the repository name or the author name at all.
+- Do NOT mention or say the repository name or the author name at all. Instead, use phrases like "this trending repository" or "this project".
 - Keep it extremely concise and to the point (under {max_words} words).
 - Explain why it's interesting or what it does.
 - Write in a conversational, enthusiastic tone.
@@ -19,7 +19,6 @@ Rules:
 """
 
 USER_PROMPT_TEMPLATE = """\
-Repository: {full_name}
 Stars: {stars:,} ⭐ | Forks: {forks:,} | Language: {language}
 Description: {description}
 
@@ -52,7 +51,6 @@ def generate_script(repo_data: Dict, config: Dict) -> str:
         system_prompt = DEFAULT_SYSTEM_PROMPT.format(max_words=max_words)
 
     user_prompt = USER_PROMPT_TEMPLATE.format(
-        full_name=repo_data.get("full_name", "unknown/repo"),
         stars=repo_data.get("stars", 0),
         forks=repo_data.get("forks", 0),
         language=repo_data.get("language", "Unknown"),
@@ -114,19 +112,16 @@ def _generate_with_openai(system_prompt: str, user_prompt: str, script_config: D
 
 def _generate_fallback_script(repo_data: Dict) -> str:
     """Generate a basic script without an LLM, using repo metadata directly."""
-    name = repo_data.get("full_name", "this repository")
     desc = repo_data.get("description", "an amazing open-source project")
     stars = repo_data.get("stars", 0)
     lang = repo_data.get("language", "multiple languages")
 
     return (
-        f"Check out {name}, a trending repository on GitHub that's taking the developer "
-        f"community by storm! {desc}. "
+        f"This repository is trending on GitHub! {desc}. "
         f"With over {stars:,} stars and built with {lang}, this project is clearly resonating "
         f"with developers worldwide. "
         f"Whether you're looking for inspiration or a powerful tool to add to your workflow, "
-        f"{name.split('/')[-1]} is definitely worth exploring. "
-        f"Head over to GitHub, give it a star, and see what all the hype is about!"
+        f"this project is definitely worth exploring. "
     )
 
 
