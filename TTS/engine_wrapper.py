@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Tuple
 
 import numpy as np
-import translators
 from moviepy import AudioFileClip
 from moviepy.audio.AudioClip import AudioClip
 from moviepy.audio.fx import MultiplyVolume
@@ -15,7 +14,7 @@ from utils.console import print_step, print_substep
 from utils.voice import sanitize_text
 
 DEFAULT_MAX_LENGTH: int = (
-    50  # Video length variable, edit this on your own risk. It should work, but it's not supported
+    60  # Max video length in seconds — adjust as needed for short-form content
 )
 
 
@@ -24,7 +23,7 @@ class TTSEngine:
 
     Args:
         tts_module            : The TTS module. Your module should handle the TTS itself and saving to the given path under the run method.
-        reddit_object         : The reddit object that contains the posts to read.
+        content_object        : The content object that contains the text to read.
         path (Optional)       : The unix style path to save the mp3 files to. This must not have leading or trailing slashes.
         max_length (Optional) : The maximum length of the mp3 files in total.
 
@@ -35,59 +34,46 @@ class TTSEngine:
     def __init__(
         self,
         tts_module,
-        reddit_object: dict,
+        content_object: dict,
         path: str = "assets/temp/",
         max_length: int = DEFAULT_MAX_LENGTH,
         last_clip_length: int = 0,
     ):
         self.tts_module = tts_module()
-        self.reddit_object = reddit_object
+        self.content_object = content_object
 
-        self.redditid = re.sub(r"[^\w\s-]", "", reddit_object["thread_id"])
-        self.path = path + self.redditid + "/mp3"
+        self.content_id = re.sub(r"[^\w\s-]", "", content_object["thread_id"])
+        self.path = path + self.content_id + "/mp3"
         self.max_length = max_length
         self.length = 0
         self.last_clip_length = last_clip_length
-
-    def add_periods(
-        self,
-    ):  # adds periods to the end of paragraphs (where people often forget to put them) so tts doesn't blend sentences
-        for comment in self.reddit_object["comments"]:
-            # remove links
-            regex_urls = r"((http|https)\:\/\/)?[a-zA-Z0-9\.\/\?\:@\-_=#]+\.([a-zA-Z]){2,6}([a-zA-Z0-9\.\&\/\?\:@\-_=#])*"
-            comment["comment_body"] = re.sub(regex_urls, " ", comment["comment_body"])
-            comment["comment_body"] = comment["comment_body"].replace("\n", ". ")
-            comment["comment_body"] = re.sub(r"\bAI\b", "A.I", comment["comment_body"])
-            comment["comment_body"] = re.sub(r"\bAGI\b", "A.G.I", comment["comment_body"])
-            if comment["comment_body"][-1] != ".":
-                comment["comment_body"] += "."
-            comment["comment_body"] = comment["comment_body"].replace(". . .", ".")
-            comment["comment_body"] = comment["comment_body"].replace(".. . ", ".")
-            comment["comment_body"] = comment["comment_body"].replace(". . ", ".")
-            comment["comment_body"] = re.sub(r'\."\.', '".', comment["comment_body"])
 
     def run(self) -> Tuple[int, int]:
         Path(self.path).mkdir(parents=True, exist_ok=True)
         print_step("Saving Text to MP3 files...")
 
-        self.add_periods()
-        self.call_tts("title", process_text(self.reddit_object["thread_title"]))
-        # processed_text = ##self.reddit_object["thread_post"] != ""
+        self.call_tts("title", process_text(self.content_object["thread_title"]))
         idx = 0
 
         if settings.config["settings"]["storymode"]:
             if settings.config["settings"]["storymodemethod"] == 0:
-                if len(self.reddit_object["thread_post"]) > self.tts_module.max_chars:
-                    self.split_post(self.reddit_object["thread_post"], "postaudio")
+                if len(self.content_object["thread_post"]) > self.tts_module.max_chars:
+                    self.split_post(self.content_object["thread_post"], "postaudio")
                 else:
-                    self.call_tts("postaudio", process_text(self.reddit_object["thread_post"]))
+                    self.call_tts(
+                        "postaudio", process_text(self.content_object["thread_post"])
+                    )
             elif settings.config["settings"]["storymodemethod"] == 1:
-                for idx, text in track(enumerate(self.reddit_object["thread_post"])):
+                for idx, text in track(
+                    enumerate(self.content_object["thread_post"]),
+                    description="Generating TTS...",
+                ):
                     self.call_tts(f"postaudio-{idx}", process_text(text))
-
         else:
-            for idx, comment in track(enumerate(self.reddit_object["comments"]), "Saving..."):
-                # ! Stop creating mp3 files if the length is greater than max length.
+            for idx, comment in track(
+                enumerate(self.content_object["comments"]), "Saving..."
+            ):
+                # Stop creating mp3 files if the length is greater than max length.
                 if self.length > self.max_length and idx > 1:
                     self.length -= self.last_clip_length
                     idx -= 1
@@ -95,8 +81,8 @@ class TTSEngine:
                 if (
                     len(comment["comment_body"]) > self.tts_module.max_chars
                 ):  # Split the comment if it is too long
-                    self.split_post(comment["comment_body"], idx)  # Split the comment
-                else:  # If the comment is not too long, just call the tts engine
+                    self.split_post(comment["comment_body"], idx)
+                else:
                     self.call_tts(f"{idx}", process_text(comment["comment_body"]))
 
         print_substep("Saved Text to MP3 files successfully.", style="bold green")
@@ -107,14 +93,14 @@ class TTSEngine:
         split_text = [
             x.group().strip()
             for x in re.finditer(
-                r" *(((.|\n){0," + str(self.tts_module.max_chars) + "})(\.|.$))", text
+                r" *(((.|\\n){0," + str(self.tts_module.max_chars) + r"})(\.|.$))",
+                text,
             )
         ]
         self.create_silence_mp3()
 
         for idy, text_cut in enumerate(split_text):
             newtext = process_text(text_cut)
-            # print(f"{idx}-{idy}: {newtext}\n")
 
             if not newtext or newtext.isspace():
                 print("newtext was blank because sanitized split text resulted in none")
@@ -155,16 +141,12 @@ class TTSEngine:
                 filepath=f"{self.path}/{filename}.mp3",
                 random_voice=settings.config["settings"]["tts"]["random_voice"],
             )
-        # try:
-        #     self.length += MP3(f"{self.path}/{filename}.mp3").info.length
-        # except (MutagenError, HeaderNotFoundError):
-        #     self.length += sox.file_info.duration(f"{self.path}/{filename}.mp3")
         try:
             clip = AudioFileClip(f"{self.path}/{filename}.mp3")
             self.last_clip_length = clip.duration
             self.length += clip.duration
             clip.close()
-        except:
+        except Exception:
             self.length = 0
 
     def create_silence_mp3(self):
@@ -179,10 +161,6 @@ class TTSEngine:
 
 
 def process_text(text: str, clean: bool = True):
-    lang = settings.config["reddit"]["thread"]["post_lang"]
+    """Process text for TTS — sanitize and clean."""
     new_text = sanitize_text(text) if clean else text
-    if lang:
-        print_substep("Translating Text...")
-        translated_text = translators.translate_text(text, translator="google", to_language=lang)
-        new_text = sanitize_text(translated_text)
     return new_text
