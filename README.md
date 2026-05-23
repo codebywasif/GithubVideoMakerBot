@@ -4,21 +4,36 @@ Scrapes the trending repositories on GitHub and Automatically create engaging, s
 
 All done WITHOUT manual video editing or asset compiling. Just pure ✨programming magic✨.
 
+## New Interactive Dashboard! 🎨
+
+We've introduced a beautiful, modern **Web Dashboard** to easily manage and create videos!
+
+![Dashboard](assets/screenshots/dashboard.png)
+
+From the dashboard you can:
+- **Create Videos:** Kick off a video generation pipeline.
+- **Review & Edit Scripts:** Pause the pipeline to review and edit the generated script before it's narrated.
+- **Manage Backgrounds:** Upload custom background images and videos, or use YouTube links.
+- **View History:** See your previously generated videos, re-download them, or view their scripts.
+- **Live Logs:** Watch the video generation process in real-time.
+
+![Create Video](assets/screenshots/create.png)
+![Backgrounds](assets/screenshots/backgrounds.png)
+
 ## How it Works 🤔
 
 This bot automatically:
 1. Scrapes the **trending repositories** on GitHub.
 2. Uses **OpenAI** (or a fallback method) to generate a catchy, concise narration script about the repository.
-3. Uses **Text-to-Speech (TTS)** to read the generated script.
-4. Uses **Playwright** to navigate to the repository and capture a smooth, dynamic, scrolling video of the actual page.
-5. Merges the scrolling video with the TTS voiceover and some chill background music.
+3. Uses **Text-to-Speech (TTS)** (including a 100% local **VoxCPM** model or OpenAI) to read the generated script.
+4. Uses **Playwright** to navigate to the repository and capture screenshots of the README.
+5. Merges everything together with the TTS voiceover, custom backgrounds, and chill background music.
 
 The result? A ready-to-upload, high-quality, short-form video that highlights cool open-source projects!
 
 ## Requirements
 
 - Python 3.10+
-- An OpenAI API Key (for script generation)
 - Playwright (installed automatically via the installation steps)
 
 ## Installation 👩‍💻
@@ -52,21 +67,24 @@ The result? A ready-to-upload, high-quality, short-form video that highlights co
     python -m playwright install-deps
     ```
 
-5. **Run the bot:**
+5. **Start the Web Dashboard:**
     ```sh
-    python main.py
+    python GUI.py
     ```
+    Then open your browser and navigate to `http://localhost:4000/`.
 
 6. **Configuration:**
-    - On the first run, the bot will create a `config.toml` file.
-    - You must provide your **OpenAI API Key** when prompted.
-    - If you need to reconfigure the bot, simply edit `config.toml` directly.
+    - You can configure the bot directly from the Web Dashboard's Settings page, or edit `config.toml`.
+    - If you want to use OpenAI for high-quality TTS or script generation, you will need to provide an **OpenAI API Key**.
+    - If you don't have an OpenAI key, you can use the completely local **VoxCPM** TTS engine!
 
 (Note: If you encounter any errors installing or running the bot, try using `python3` or `pip3` instead of `python` or `pip`.)
 
+![Settings](assets/screenshots/settings.png)
+
 ## Output
 
-Videos are rendered and saved in the `results/github/` directory. The bot keeps track of repositories it has already processed so it won't create duplicate videos.
+Videos are rendered and saved in the `results/github/` directory. The bot keeps track of repositories it has already processed so it won't create duplicate videos. You can also view and download all of them directly from the History tab in the dashboard.
 
 ## Contributing & Ways to improve 📈
 

@@ -80,7 +80,9 @@ def prepare_background(content_id: str, W: int, H: int) -> str:
     output_path = f"assets/temp/{content_id}/background_noaudio.mp4"
     output = (
         ffmpeg.input(f"assets/temp/{content_id}/background.mp4")
-        .filter("crop", f"ih*({W}/{H})", "ih")
+        # Center crop: scale to cover, then crop the center.
+        .filter("scale", f"max({W},iw*({H}/ih))", f"max({H},ih*({W}/iw))")
+        .filter("crop", W, H)
         .output(
             output_path,
             an=None,
@@ -223,14 +225,20 @@ def make_final_video(
 
     background_clip = ffmpeg.input(prepare_background(content_id, W=W, H=H))
 
-    # Gather all audio clips
+    # Gather all audio clips and durations
     audio_clips = list()
+    audio_clips_durations = list()
+    
     if settings.config["settings"]["storymode"]:
         if settings.config["settings"]["storymodemethod"] == 0:
             audio_clips = [ffmpeg.input(f"assets/temp/{content_id}/mp3/title.mp3")]
             audio_clips.insert(
                 1, ffmpeg.input(f"assets/temp/{content_id}/mp3/postaudio.mp3")
             )
+            audio_clips_durations = [
+                float(ffmpeg.probe(f"assets/temp/{content_id}/mp3/title.mp3")["format"]["duration"]),
+                float(ffmpeg.probe(f"assets/temp/{content_id}/mp3/postaudio.mp3")["format"]["duration"])
+            ]
         elif settings.config["settings"]["storymodemethod"] == 1:
             audio_clips = [
                 ffmpeg.input(f"assets/temp/{content_id}/mp3/postaudio-{i}.mp3")
@@ -240,6 +248,13 @@ def make_final_video(
             ]
             audio_clips.insert(
                 0, ffmpeg.input(f"assets/temp/{content_id}/mp3/title.mp3")
+            )
+            audio_clips_durations = [
+                float(ffmpeg.probe(f"assets/temp/{content_id}/mp3/postaudio-{i}.mp3")["format"]["duration"])
+                for i in range(number_of_clips + 1)
+            ]
+            audio_clips_durations.insert(
+                0, float(ffmpeg.probe(f"assets/temp/{content_id}/mp3/title.mp3")["format"]["duration"])
             )
     else:
         audio_clips = [
@@ -274,12 +289,42 @@ def make_final_video(
 
     console.log(f"[bold green] Video Will Be: {length} Seconds Long")
 
-    screenshot_width = int((W * 45) // 100)
+    screenshot_width = int((W * 90) // 100)
     audio = ffmpeg.input(f"assets/temp/{content_id}/audio.mp3")
     final_audio = merge_background_audio(audio, content_id)
 
-    # As requested, do not overlay any images (front image, segment images) since the dynamic background is sufficient.
-    print_step("Skipping image overlays over background.")
+    print_step("Overlaying screenshots over background.")
+    
+    # Overlay the images
+    current_time = 0.0
+    
+    # Title image
+    title_path = f"assets/temp/{content_id}/png/title.png"
+    if exists(title_path):
+        img_clip = ffmpeg.input(title_path)
+        img_clip = img_clip.filter("scale", screenshot_width, -1)
+        background_clip = ffmpeg.overlay(
+            background_clip, 
+            img_clip, 
+            x="(W-w)/2", y="(H-h)/2", 
+            enable=f"between(t,{current_time},{current_time + audio_clips_durations[0]})"
+        )
+    current_time += audio_clips_durations[0]
+
+    # Segment images
+    for i in range(number_of_clips + 1 if settings.config["settings"]["storymodemethod"] == 1 else number_of_clips):
+        img_path = f"assets/temp/{content_id}/png/img{i}.png"
+        if exists(img_path):
+            img_clip = ffmpeg.input(img_path)
+            img_clip = img_clip.filter("scale", screenshot_width, -1)
+            duration = audio_clips_durations[i + 1]
+            background_clip = ffmpeg.overlay(
+                background_clip, 
+                img_clip, 
+                x="(W-w)/2", y="(H-h)/2", 
+                enable=f"between(t,{current_time},{current_time + duration})"
+            )
+            current_time += duration
 
     title = extract_id(content_obj, "thread_title")
     idx = extract_id(content_obj)
